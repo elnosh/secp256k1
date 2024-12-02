@@ -61,6 +61,14 @@ type Point struct {
 	InfinityPoint bool
 }
 
+func (p *Point) Copy() *Point {
+	return &Point{
+		X:             p.X,
+		Y:             p.Y,
+		InfinityPoint: p.InfinityPoint,
+	}
+}
+
 func (p *Point) Add(p1 *Point, p2 *Point) *Point {
 	if p1.InfinityPoint {
 		p = &Point{X: p2.X, Y: p2.Y, InfinityPoint: p2.InfinityPoint}
@@ -123,4 +131,22 @@ func (p *Point) Add(p1 *Point, p2 *Point) *Point {
 
 	p = &Point{X: x3, Y: y3, InfinityPoint: false}
 	return p
+}
+
+// does double-and-add algorithm
+func (p *Point) ScalarMult(k *big.Int) *Point {
+	k.Mod(k, n)
+
+	q := g.Copy()
+	r := &Point{InfinityPoint: true}
+
+	for k.Sign() > 0 {
+		if new(big.Int).And(k, big.NewInt(1)).Bit(0) == 1 {
+			r.Add(r, q)
+		}
+		q.Add(q, q)
+		k.Rsh(k, 1)
+	}
+
+	return r
 }
