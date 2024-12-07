@@ -30,8 +30,7 @@ func Sign(key *secp256k1.PrivateKey, hash []byte) (*Signature, error) {
 	kinverse.ModInverse(k.SecretKey.N, secp256k1.Curve.N)
 	s.Mul(s, kinverse).Mod(s, secp256k1.Curve.N)
 
-	signature := &Signature{r, s}
-	return signature, nil
+	return &Signature{r: r, s: s}, nil
 }
 
 func (s *Signature) Verify(publicKey *secp256k1.PublicKey, hash []byte) bool {
