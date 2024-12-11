@@ -152,6 +152,16 @@ func (p *Point) Add(p1 *Point, p2 *Point) *Point {
 	return p
 }
 
+func (p *Point) Inverse() *Point {
+	yNeg := new(big.Int).Set(p.Y.Value)
+	yNeg.Neg(yNeg)
+	return &Point{
+		X:             NewFieldElement(p.X.Value),
+		Y:             NewFieldElement(yNeg),
+		InfinityPoint: p.InfinityPoint,
+	}
+}
+
 // big integer modulo n
 type Scalar struct {
 	N *big.Int
@@ -223,6 +233,10 @@ func GeneratePrivateKey() (*PrivateKey, error) {
 	}
 	k := NewPrivateKey(scalar)
 	return k, nil
+}
+
+func (pk *PrivateKey) Copy() *PrivateKey {
+	return NewPrivateKey(pk.SecretKey)
 }
 
 type PublicKey struct {
