@@ -26,7 +26,7 @@ func sign(key *secp256k1.PrivateKey, hash []byte, nonce *secp256k1.PrivateKey) (
 	sk := key.Copy()
 
 	y := new(big.Int).Set(sk.PublicKey.Y.Value)
-	mod := y.Mod(y, big.NewInt(2))
+	mod := new(big.Int).Mod(y, big.NewInt(2))
 	// negate secret key if y-coordinate is not even
 	if mod.Cmp(big.NewInt(0)) != 0 {
 		d := new(big.Int).Sub(secp256k1.Curve.N, sk.SecretKey.N)
@@ -51,7 +51,8 @@ func sign(key *secp256k1.PrivateKey, hash []byte, nonce *secp256k1.PrivateKey) (
 
 	kint := new(big.Int).SetBytes(rand)
 	kint.Mod(kint, secp256k1.Curve.N)
-	if kint.Cmp(big.NewInt(0)) == 0 {
+	mod = new(big.Int).Mod(kint, secp256k1.Curve.N)
+	if mod.Cmp(big.NewInt(0)) == 0 {
 		return nil, errors.New("could not generate signature")
 	}
 
@@ -62,7 +63,7 @@ func sign(key *secp256k1.PrivateKey, hash []byte, nonce *secp256k1.PrivateKey) (
 
 	k := secp256k1.NewPrivateKey(kScalar)
 	y = new(big.Int).Set(k.PublicKey.Y.Value)
-	mod = y.Mod(y, big.NewInt(2))
+	mod = new(big.Int).Mod(y, big.NewInt(2))
 	if k.PublicKey.InfinityPoint || mod.Cmp(big.NewInt(0)) != 0 {
 		kint := new(big.Int).Sub(secp256k1.Curve.N, kint)
 		kScalar, err := secp256k1.NewScalar(kint)
@@ -86,7 +87,7 @@ func sign(key *secp256k1.PrivateKey, hash []byte, nonce *secp256k1.PrivateKey) (
 
 func (s *Signature) Verify(pubkey *secp256k1.PublicKey, hash []byte) bool {
 	y := new(big.Int).Set(pubkey.Y.Value)
-	mod := y.Mod(y, big.NewInt(2))
+	mod := new(big.Int).Mod(y, big.NewInt(2))
 	// fail if y-coordinate of public key is not even
 	if mod.Cmp(big.NewInt(0)) != 0 {
 		return false
@@ -124,9 +125,9 @@ func (s *Signature) Verify(pubkey *secp256k1.PublicKey, hash []byte) bool {
 		return false
 	}
 
-	RY := new(big.Int).Set(pubkey.Y.Value)
-	modRY := RY.Mod(RY, big.NewInt(2))
-	if modRY.Cmp(big.NewInt(0)) != 0 {
+	RY := new(big.Int).Set(R.Y.Value)
+	mod = new(big.Int).Mod(RY, big.NewInt(2))
+	if mod.Cmp(big.NewInt(0)) != 0 {
 		return false
 	}
 
@@ -144,4 +145,46 @@ func TaggedHash(tag string, x []byte) []byte {
 	data = append(data, x...)
 	hash := sha256.Sum256(data)
 	return hash[:]
+}
+
+// this does lift_x as explained in the bip
+func ParsePublicKey(pubkeyBytes []byte) (*secp256k1.PublicKey, error) {
+	xcoordinate := new(big.Int).SetBytes(pubkeyBytes)
+
+	if xcoordinate.Cmp(secp256k1.Curve.P) > 0 {
+		return nil, errors.New("x is over p")
+	}
+
+	c := secp256k1.NewFieldElement(xcoordinate)
+	c.Pow(c, big.NewInt(3)).Add(c, secp256k1.Curve.B)
+
+	exponent := new(big.Int).Set(secp256k1.Curve.P)
+	exponent.Add(exponent, big.NewInt(1)).Div(exponent, big.NewInt(4)).Mod(exponent, secp256k1.Curve.P)
+
+	y := secp256k1.NewFieldElement(c.Value)
+	y.Pow(y, exponent)
+
+	ysquared := secp256k1.NewFieldElement(y.Value)
+	ysquared.Pow(ysquared, big.NewInt(2))
+
+	if !ysquared.Equal(c) {
+		return nil, errors.New("invalid public key")
+	}
+
+	yint := new(big.Int).Set(y.Value)
+	mod := new(big.Int).Mod(yint, big.NewInt(2))
+	if mod.Cmp(big.NewInt(0)) != 0 {
+		ycoordinate := new(big.Int).Set(secp256k1.Curve.P)
+		ycoordinate.Sub(ycoordinate, yint)
+
+		y = secp256k1.NewFieldElement(ycoordinate)
+	}
+
+	point := &secp256k1.Point{
+		X:             secp256k1.NewFieldElement(xcoordinate),
+		Y:             y,
+		InfinityPoint: false,
+	}
+
+	return &secp256k1.PublicKey{point}, nil
 }

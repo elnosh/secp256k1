@@ -11,8 +11,8 @@ type CurveParams struct {
 	P *big.Int
 
 	// y^2 = x^3 + ax + b
-	A int
-	B int
+	A *FieldElement
+	B *FieldElement
 
 	// order n of G
 	N *big.Int
@@ -37,5 +37,5 @@ func init() {
 
 	g := &Point{X: gx, Y: gy, InfinityPoint: false}
 
-	Curve = &CurveParams{P: p, A: 0, B: 7, N: n, G: g}
+	Curve = &CurveParams{P: p, A: NewFieldElement(big.NewInt(0)), B: NewFieldElement(big.NewInt(7)), N: n, G: g}
 }
